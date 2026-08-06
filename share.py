@@ -62,26 +62,12 @@ def get_ground_level(pcd, dataset_name):
     ) / 2
 
     plt.figure(figsize=(10, 6))
-
-    plt.hist(
-        z_values,
-        bins=bin_edges,
-        edgecolor="black",
-        linewidth=0.2
-    )
-
-    plt.axvline(
-        ground_level,
-        linestyle="--",
-        linewidth=2,
-        label=f"Ground level = {ground_level:.2f} m"
-    )
-
+    plt.hist(z_values, bins=bin_edges, edgecolor="black", linewidth=0.2)
+    plt.axvline(ground_level, linestyle="--", linewidth=2, label=f"Ground level = {ground_level:.2f} m")
     plt.title(f"{dataset_name}: histogram of z-values")
     plt.xlabel("z value (m)")
     plt.ylabel("Number of points")
     plt.legend()
-
     plt.savefig(
         image_folder / f"{dataset_name}_ground_histogram.png",
         dpi=300,
@@ -92,12 +78,73 @@ def get_ground_level(pcd, dataset_name):
 
     return float(ground_level)
 
+def get_optimal_epsilon(points, dataset_name):
+    tree = KDTree(points)
+
+    distances, _ = tree.query(
+        points,
+        k=min_samples
+    )
+
+    fifth_neighbour_distances = np.sort(
+        distances[:, -1]
+    )
+
+    # Remove only the most extreme final 0.5 percent
+    # while locating the elbow.
+    trim_count = int(
+        len(fifth_neighbour_distances) * 0.995
+    )
+
+    trimmed_distances = fifth_neighbour_distances[
+        :trim_count
+    ]
+
+    x_normalized = np.linspace(
+        0,
+        1,
+        len(trimmed_distances)
+    )
+
+    y_normalized = (
+        trimmed_distances - trimmed_distances.min()
+    ) / (
+        trimmed_distances.max()
+        - trimmed_distances.min()
+    )
+
+    difference = x_normalized - y_normalized
+
+    elbow_index = np.argmax(difference)
+
+    optimal_epsilon = float(
+        trimmed_distances[elbow_index]
+    )
+
+    optimal_epsilon = round(
+        optimal_epsilon,
+        2
+    )
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(trimmed_distances)
+    plt.axvline(elbow_index,linestyle="--",label="Detected elbow")
+    plt.axhline(optimal_epsilon, linestyle="--",label=f"eps = {optimal_epsilon:.2f}")
+    plt.scatter(elbow_index,optimal_epsilon,s=60)
+    plt.title(f"{dataset_name}: fifth-neighbour elbow plot")
+
+    plt.xlabel("Points sorted by distance")
+    plt.ylabel("Fifth-neighbour distance")
+    plt.legend()
+
+    plt.savefig(image_folder / f"{dataset_name}_elbow.png", dpi=300, bbox_inches="tight")
+    plt.show()
+
+    return optimal_epsilon
+
 
 #%% read file containing point cloud data
-datasets = [
-    ("dataset1", "dataset1.npy"),
-    ("dataset2", "dataset2.npy")
-]
+datasets = [ ("dataset1", "dataset1.npy"), ("dataset2", "dataset2.npy")]
 
 for dataset_name, dataset_file in datasets:
     print("\nProcessing:", dataset_name)
@@ -111,18 +158,14 @@ for dataset_name, dataset_file in datasets:
         dataset_name
     )
 
-    print(
-        f"Ground level: {est_ground_level:.2f} m"
-    )
+    print(f"Ground level: {est_ground_level:.2f} m"
+)
 
     pcd_above_ground = pcd[
         pcd[:, 2] > est_ground_level
     ]
 
-    print(
-        "Points above ground:",
-        pcd_above_ground.shape
-    )
+    print("Points above ground:",pcd_above_ground.shape)
 
     show_cloud(pcd_above_ground)
 
@@ -159,9 +202,12 @@ show_cloud(pcd_above_ground)
 
 
 # %%
-unoptimal_eps = 10
+optimal_eps = get_optimal_epsilon(pcd_above_ground,dataset_name)
+
+print(f"Optimal epsilon: {optimal_eps:.2f}")
+
 # find the elbow
-clustering = DBSCAN(eps = unoptimal_eps, min_samples=5).fit(pcd_above_ground)
+clustering = DBSCAN(eps = optimal_eps, min_samples=min_samples).fit(pcd_above_ground)
 
 #%%
 clusters = len(set(clustering.labels_)) - (1 if -1 in clustering.labels_ else 0)
@@ -169,13 +215,13 @@ colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, clusters)]
 
 # %%
 # Plotting resulting clusters
+plt.savefig(image_folder / f"{dataset_name}_clusters.png",dpi=300, bbox_inches="tight")
 plt.figure(figsize=(10,10))
 plt.scatter(pcd_above_ground[:,0], 
             pcd_above_ground[:,1],
             c=clustering.labels_,
             cmap=matplotlib.colors.ListedColormap(colors),
             s=2)
-
 
 plt.title('DBSCAN: %d clusters' % clusters,fontsize=20)
 plt.xlabel('x axis',fontsize=14)
