@@ -16,6 +16,15 @@ from scipy.spatial import KDTree
 from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from pathlib import Path
+
+project_folder = Path(__file__).resolve().parent
+
+image_folder = project_folder / "images"
+image_folder.mkdir(exist_ok=True)
+
+ground_bin_width = 0.05
+min_samples = 5
 
 
 #%% utility functions
@@ -28,17 +37,99 @@ def show_scatter(x,y):
     plt.scatter(x, y)
     plt.show()
 
-def get_ground_level(pcd):
-    return 64
+def get_ground_level(pcd, dataset_name):
+    z_values = pcd[:, 2]
+
+    minimum_z = np.min(z_values)
+    maximum_z = np.max(z_values)
+
+    bin_edges = np.arange(
+        minimum_z,
+        maximum_z + ground_bin_width,
+        ground_bin_width
+    )
+
+    histogram_values, histogram_edges = np.histogram(
+        z_values,
+        bins=bin_edges
+    )
+
+    largest_bin_index = np.argmax(histogram_values)
+
+    ground_level = (
+        histogram_edges[largest_bin_index]
+        + histogram_edges[largest_bin_index + 1]
+    ) / 2
+
+    plt.figure(figsize=(10, 6))
+
+    plt.hist(
+        z_values,
+        bins=bin_edges,
+        edgecolor="black",
+        linewidth=0.2
+    )
+
+    plt.axvline(
+        ground_level,
+        linestyle="--",
+        linewidth=2,
+        label=f"Ground level = {ground_level:.2f} m"
+    )
+
+    plt.title(f"{dataset_name}: histogram of z-values")
+    plt.xlabel("z value (m)")
+    plt.ylabel("Number of points")
+    plt.legend()
+
+    plt.savefig(
+        image_folder / f"{dataset_name}_ground_histogram.png",
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
+
+    return float(ground_level)
 
 
 #%% read file containing point cloud data
-pcd = np.load("dataset1.npy")
+datasets = [
+    ("dataset1", "dataset1.npy"),
+    ("dataset2", "dataset2.npy")
+]
+
+for dataset_name, dataset_file in datasets:
+    print("\nProcessing:", dataset_name)
+
+    pcd = np.load(dataset_file)
+
+    print("Point-cloud shape:", pcd.shape)
+
+    est_ground_level = get_ground_level(
+        pcd,
+        dataset_name
+    )
+
+    print(
+        f"Ground level: {est_ground_level:.2f} m"
+    )
+
+    pcd_above_ground = pcd[
+        pcd[:, 2] > est_ground_level
+    ]
+
+    print(
+        "Points above ground:",
+        pcd_above_ground.shape
+    )
+
+    show_cloud(pcd_above_ground)
 
 pcd.shape
 
 #%% show downsampled data in external window
-%matplotlib qt
+#%matplotlib qt
 show_cloud(pcd)
 #show_cloud(pcd[::10]) # keep every 10th point
 
