@@ -16,6 +16,9 @@ Ground Level was estimated using a histogram of the z-values for each dataset.
 
 ## Results
 |Dataset|Ground Level (m)|
-|--------|---------------|
+|--------|---------------:|
 |dataset1| 61.25|
 |dataset2| 61.24|
+
+### Histogram - Dataset 1
+![Dataset1 Ground](images/dataset1_ground_histogram.png)
