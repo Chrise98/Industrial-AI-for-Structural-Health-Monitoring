@@ -7,7 +7,6 @@ Readme file should have the numerical values as described in each task
 Create a folder to store the images as described in the tasks.
 
 Try to create commits and version for each task.
-
 '''
 #%%
 import matplotlib
@@ -43,23 +42,13 @@ def get_ground_level(pcd, dataset_name):
     minimum_z = np.min(z_values)
     maximum_z = np.max(z_values)
 
-    bin_edges = np.arange(
-        minimum_z,
-        maximum_z + ground_bin_width,
-        ground_bin_width
-    )
+    bin_edges = np.arange(minimum_z,maximum_z + ground_bin_width,ground_bin_width)
 
-    histogram_values, histogram_edges = np.histogram(
-        z_values,
-        bins=bin_edges
-    )
+    histogram_values, histogram_edges = np.histogram(z_values,bins=bin_edges)
 
     largest_bin_index = np.argmax(histogram_values)
 
-    ground_level = (
-        histogram_edges[largest_bin_index]
-        + histogram_edges[largest_bin_index + 1]
-    ) / 2
+    ground_level = (histogram_edges[largest_bin_index]+ histogram_edges[largest_bin_index + 1]) / 2
 
     plt.figure(figsize=(10, 6))
     plt.hist(z_values, bins=bin_edges, edgecolor="black", linewidth=0.2)
@@ -68,12 +57,7 @@ def get_ground_level(pcd, dataset_name):
     plt.xlabel("z value (m)")
     plt.ylabel("Number of points")
     plt.legend()
-    plt.savefig(
-        image_folder / f"{dataset_name}_ground_histogram.png",
-        dpi=300,
-        bbox_inches="tight"
-    )
-
+    plt.savefig(image_folder / f"{dataset_name}_ground_histogram.png",dpi=300,bbox_inches="tight")
     plt.show()
 
     return float(ground_level)
@@ -142,124 +126,192 @@ def get_optimal_epsilon(points, dataset_name):
 
     return optimal_epsilon
 
+def find_largest_cluster(
+    pcd_above_ground,
+    cluster_labels
+):
+    largest_cluster_information = None
+
+    for cluster_number in np.unique(
+        cluster_labels
+    ):
+
+        # DBSCAN assigns -1 to noise.
+        if cluster_number == -1:
+            continue
+
+        cluster_points = pcd_above_ground[
+            cluster_labels == cluster_number
+        ]
+
+        minimum_x = np.min(
+            cluster_points[:, 0]
+        )
+
+        maximum_x = np.max(
+            cluster_points[:, 0]
+        )
+
+        minimum_y = np.min(
+            cluster_points[:, 1]
+        )
+
+        maximum_y = np.max(
+            cluster_points[:, 1]
+        )
+
+        x_span = maximum_x - minimum_x
+        y_span = maximum_y - minimum_y
+
+        cluster_area = x_span * y_span
+
+        current_information = {
+            "cluster_number": int(cluster_number),
+            "points": cluster_points,
+            "minimum_x": float(minimum_x),
+            "maximum_x": float(maximum_x),
+            "minimum_y": float(minimum_y),
+            "maximum_y": float(maximum_y),
+            "x_span": float(x_span),
+            "y_span": float(y_span),
+            "area": float(cluster_area)
+        }
+
+        if (
+            largest_cluster_information is None
+            or current_information["area"]
+            > largest_cluster_information["area"]
+        ):
+            largest_cluster_information = (
+                current_information
+            )
+
+    return largest_cluster_information
 
 #%% read file containing point cloud data
-datasets = [ ("dataset1", "dataset1.npy"), ("dataset2", "dataset2.npy")]
+datasets = [("dataset1", "dataset1.npy"),("dataset2", "dataset2.npy")]
 
 for dataset_name, dataset_file in datasets:
-    print("\nProcessing:", dataset_name)
+    print("\n" + "=" * 60)
+    print("Processing:", dataset_name)
+    print("=" * 60)
 
+    # Load one dataset
     pcd = np.load(dataset_file)
 
     print("Point-cloud shape:", pcd.shape)
 
-    est_ground_level = get_ground_level(
-        pcd,
-        dataset_name
-    )
+    # Show the original point cloud
+    show_cloud(pcd[::10])
 
-    print(f"Ground level: {est_ground_level:.2f} m"
-)
-
-    pcd_above_ground = pcd[
-        pcd[:, 2] > est_ground_level
-    ]
-
-    print("Points above ground:",pcd_above_ground.shape)
-
-    show_cloud(pcd_above_ground)
-
-pcd.shape
 
 #%% show downsampled data in external window
 #%matplotlib qt
-show_cloud(pcd)
 #show_cloud(pcd[::10]) # keep every 10th point
-
 #%% remove ground plane
 
-'''
-Task 1 (3)
-find the best value for the ground level
-One way to do it is useing a histogram 
-np.histogram
-
-update the function get_ground_level() with your changes
-
-For both the datasets
-Report the ground level in the readme file in your github project
-Add the histogram plots to your project readme
-'''
-est_ground_level = get_ground_level(pcd)
-print(est_ground_level)
-
-pcd_above_ground = pcd[pcd[:,2] > est_ground_level] 
-#%%
-pcd_above_ground.shape
-
-#%% side view
-show_cloud(pcd_above_ground)
+# Task 1 (3)
+#vfind the best value for the ground level
+#VOne way to do it is useing a histogram 
+#vnp.histogram
+#update the function get_ground_level() with your changes
+#For both the datasets
+#Report the ground level in the readme file in your github project
+#vAdd the histogram plots to your project readme
 
 
-# %%
-optimal_eps = get_optimal_epsilon(pcd_above_ground,dataset_name)
+    est_ground_level = get_ground_level(pcd,dataset_name)
 
-print(f"Optimal epsilon: {optimal_eps:.2f}")
+    print(f"Ground level: {est_ground_level:.2f} m")
 
-# find the elbow
-clustering = DBSCAN(eps = optimal_eps, min_samples=min_samples).fit(pcd_above_ground)
+    pcd_above_ground = pcd[pcd[:, 2] > est_ground_level]
 
-#%%
-clusters = len(set(clustering.labels_)) - (1 if -1 in clustering.labels_ else 0)
-colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, clusters)]
+    print("Points above ground:",pcd_above_ground.shape)
 
-# %%
-# Plotting resulting clusters
-plt.savefig(image_folder / f"{dataset_name}_clusters.png",dpi=300, bbox_inches="tight")
-plt.figure(figsize=(10,10))
-plt.scatter(pcd_above_ground[:,0], 
-            pcd_above_ground[:,1],
-            c=clustering.labels_,
-            cmap=matplotlib.colors.ListedColormap(colors),
-            s=2)
-
-plt.title('DBSCAN: %d clusters' % clusters,fontsize=20)
-plt.xlabel('x axis',fontsize=14)
-plt.ylabel('y axis',fontsize=14)
-plt.show()
+    # Show the cloud after removing the ground
+    show_cloud(pcd_above_ground[::5])
 
 
 #%%
-'''
-Task 2 (+1)
 
-Find an optimized value for eps.
-Plot the elbow and extract the optimal value from the plot
-Apply DBSCAN again with the new eps value and confirm visually that clusters are proper
+#Task 2 (+1)
 
-https://www.analyticsvidhya.com/blog/2020/09/how-dbscan-clustering-works/
-https://machinelearningknowledge.ai/tutorial-for-dbscan-clustering-in-python-sklearn/
+#Find an optimized value for eps.
+#Plot the elbow and extract the optimal value from the plot
+#Apply DBSCAN again with the new eps value and confirm visually that clusters are proper
 
-For both the datasets
-Report the optimal value of eps in the Readme to your github project
-Add the elbow plots to your github project Readme
-Add the cluster plots to your github project Readme
-'''
+#https://www.analyticsvidhya.com/blog/2020/09/how-dbscan-clustering-works/
+#https://machinelearningknowledge.ai/tutorial-for-dbscan-clustering-in-python-sklearn/
 
+#For both the datasets
+#Report the optimal value of eps in the Readme to your github project
+#Add the elbow plots to your github project Readme
+#Add the cluster plots to your github project Readme
+#'''
 
+    optimal_eps = get_optimal_epsilon(pcd_above_ground,dataset_name)
 
+    print(f"Optimal epsilon: {optimal_eps:.2f}")
+
+    clustering = DBSCAN(eps=optimal_eps,min_samples=min_samples).fit(pcd_above_ground)
+
+    clusters = (len(set(clustering.labels_))- (1 if -1 in clustering.labels_ else 0))
+
+    print("Number of clusters:", clusters)
+    print("Number of noise points:",np.sum(clustering.labels_ == -1))
+
+    colors = [plt.cm.Spectral(each)for each in np.linspace(0,1,max(clusters, 1))]
+
+    # Plot resulting clusters
+    plt.figure(figsize=(10, 10))
+
+    plt.scatter(
+        pcd_above_ground[:, 0],
+        pcd_above_ground[:, 1],
+        c=clustering.labels_,
+        cmap=matplotlib.colors.ListedColormap(colors),
+        s=2
+    )
+
+    plt.title(f"{dataset_name}: DBSCAN - {clusters} clusters",fontsize=20)
+    plt.xlabel("x axis", fontsize=14)
+    plt.ylabel("y axis", fontsize=14)
+    plt.savefig(image_folder / f"{dataset_name}_clusters.png",dpi=300,bbox_inches="tight")
+    plt.show()
+    plt.close()
 
 #%%
-'''
-Task 3 (+1)
+#'''
+#Task 3 (+1)
+#Find the largest cluster, since that should be the catenary, 
+#beware of the noise cluster.
+#Use the x,y span for the clusters to find the largest cluster
+#For both the datasets
+#Report min(x), min(y), max(x), max(y) for the catenary cluster in the Readme of your github project
+#Add the plot of the catenary cluster to the readme
+#'''
 
-Find the largest cluster, since that should be the catenary, 
-beware of the noise cluster.
+    catenary = find_largest_cluster(
+        pcd_above_ground,
+        clustering.labels_
+    )
 
-Use the x,y span for the clusters to find the largest cluster
+    print("Catenary cluster:",catenary["cluster_number"])
 
-For both the datasets
-Report min(x), min(y), max(x), max(y) for the catenary cluster in the Readme of your github project
-Add the plot of the catenary cluster to the readme
+    print(f"min(x) = {catenary['minimum_x']:.2f} m")
+    print(f"min(y) = {catenary['minimum_y']:.2f} m")
+    print(f"max(x) = {catenary['maximum_x']:.2f} m")
+    print(f"max(y) = {catenary['maximum_y']:.2f} m")
 
-'''
+    print(f"x span = {catenary['x_span']:.2f} m")
+    print(f"y span = {catenary['y_span']:.2f} m")
+    print(f"Catenary area = {catenary['area']:.2f} m²")
+
+    plt.figure(figsize=(10, 8))
+    plt.scatter(catenary["points"][:, 0],catenary["points"][:, 1],s=2)
+    plt.title(f"{dataset_name}: selected catenary cluster\n" f"Area = {catenary['area']:.2f} m²")
+    plt.xlabel("x axis")
+    plt.ylabel("y axis")
+    plt.savefig(image_folder/ f"{dataset_name}_catenary_cluster.png",dpi=300,bbox_inches="tight")
+    plt.show()
+    plt.close()
